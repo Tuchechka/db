@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_mysqldb import MySQL
 from route import api_bp
+from flasgger import Swagger
 
 app = Flask(__name__)
 
@@ -16,6 +17,16 @@ app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', '3306'))
 # створюємо клієнт ПІСЛЯ конфігурації
 mysql = MySQL(app)
 app.mysql = mysql
+
+swagger = Swagger(app, template={
+    "swagger": "2.0",
+    "info": {
+        "title": "DB&Knowledge Course API",
+        "version": "1.0.0",
+        "description": "REST endpoints for users/courses/modules/tests/questions"
+    },
+    "basePath": "/",  # корінь
+})
 
 def init_db_mysql():
     """Одноразова ініціалізація БД із data.sql."""
