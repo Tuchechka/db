@@ -1,34 +1,49 @@
+# app/my_project/auth/app.py
 import os
 from flask import Flask
 from flask_mysqldb import MySQL
 from route import api_bp
 
 app = Flask(__name__)
+
+# ---- MySQL config: беремо з env (див. /etc/flaskapp.env) ----
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'appuser')
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'appdb')
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', '127.0.0.1')
+app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', '3306'))
+
+# створюємо клієнт ПІСЛЯ конфігурації
 mysql = MySQL(app)
-
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = '' # ВИПРАВИТИ ТУТ І НАСТУПНИЙ РЯДОК!!!!!!!!!!
-app.config['MYSQL_DB'] = 'mydb'
-app.config['MYSQL_HOST'] = 'localhost'
-
 app.mysql = mysql
 
 def init_db_mysql():
+    """Одноразова ініціалізація БД із data.sql."""
     cursor = mysql.connection.cursor()
     sql_file_path = os.path.join(os.path.dirname(__file__), 'data.sql')
-    
-    with open(sql_file_path, 'r') as f:
-        sql_commands = f.read().split(';')
-        
-        for command in sql_commands:
-            if command.strip(): 
-                cursor.execute(command)
-    
-    mysql.connection.commit()
+    if os.path.exists(sql_file_path):
+        with open(sql_file_path, 'r') as f:
+            for command in (c.strip() for c in f.read().split(';')):
+                if command:
+                    cursor.execute(command)
+        mysql.connection.commit()
     cursor.close()
 
+# health-check БД (зручно для перевірки п.2)
+@app.route("/health/db")
+def health_db():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        cur.close()
+        return {"ok": True}, 200
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
+
+# реєстрація API
 app.register_blueprint(api_bp, url_prefix='/api')
 
-if __name__ == '__main__':
+# dev-запуск: у проді запускає Gunicorn, тому без app.run() і без init тут
+if __name__ == "__main__":
     app.run(debug=True)
-    init_db_mysql()
