@@ -41,10 +41,10 @@ def init_db_mysql():
 @app.route("/health/db")
 def health_db():
     try:
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT 1")
-        cur.fetchone()
-        cur.close()
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
         return {"ok": True}, 200
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
