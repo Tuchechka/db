@@ -7,14 +7,12 @@ from flasgger import Swagger
 
 app = Flask(__name__)
 
-# ---- MySQL config: беремо з env (див. /etc/flaskapp.env) ----
 app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'appuser')
 app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
 app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'appdb')
 app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', '127.0.0.1')
 app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', '3306'))
 
-# створюємо клієнт ПІСЛЯ конфігурації
 mysql = MySQL(app)
 app.mysql = mysql
 
@@ -25,7 +23,7 @@ swagger = Swagger(app, template={
         "version": "1.0.0",
         "description": "REST endpoints for users/courses/modules/tests/questions"
     },
-    "basePath": "/",  # корінь
+    "basePath": "/",  
 })
 
 def init_db_mysql():
@@ -40,7 +38,6 @@ def init_db_mysql():
         mysql.connection.commit()
     cursor.close()
 
-# health-check БД (зручно для перевірки п.2)
 @app.route("/health/db")
 def health_db():
     try:
@@ -61,9 +58,7 @@ def debug_env():
         "MYSQL_PORT": app.config.get("MYSQL_PORT"),
     }, 200
 
-# реєстрація API
 app.register_blueprint(api_bp, url_prefix='/api')
 
-# dev-запуск: у проді запускає Gunicorn, тому без app.run() і без init тут
 if __name__ == "__main__":
     app.run(debug=True)
