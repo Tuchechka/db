@@ -41,6 +41,15 @@ def health_db():
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
+@app.route("/debug/env")
+def debug_env():
+    return {
+        "MYSQL_HOST": app.config.get("MYSQL_HOST"),
+        "MYSQL_DB": app.config.get("MYSQL_DB"),
+        "MYSQL_USER": app.config.get("MYSQL_USER"),
+        "MYSQL_PORT": app.config.get("MYSQL_PORT"),
+    }, 200
+
 # реєстрація API
 app.register_blueprint(api_bp, url_prefix='/api')
 
