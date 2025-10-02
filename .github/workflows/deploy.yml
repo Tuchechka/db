@@ -2,12 +2,17 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch: {}
+    branches: [ "main" ]   # деплой при пуші в main
+  workflow_dispatch: {}     # дозволяє запускати вручну з вкладки Actions
+
+concurrency:
+  group: ec2-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +25,13 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            # клон (якщо ще нема) або хард-оновлення з main
+
+            # 1) виправляємо власника каталогу і дозволяємо git працювати
+            sudo mkdir -p /home/ubuntu/db
+            sudo chown -R ubuntu:ubuntu /home/ubuntu/db
+            git config --global --add safe.directory /home/ubuntu/db
+
+            # 2) клон або жорстке оновлення
             if [ ! -d /home/ubuntu/db/.git ]; then
               cd /home/ubuntu
               git clone https://github.com/Tuchechka/db.git db
@@ -30,7 +41,7 @@ jobs:
               git reset --hard origin/main
             fi
 
-            # залежності
+            # 3) залежності
             cd /home/ubuntu/db/app
             if [ ! -d venv ]; then python3 -m venv venv; fi
             source venv/bin/activate
@@ -38,12 +49,13 @@ jobs:
             if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
             deactivate
 
-            # рестарт сервісу
+            # 4) рестарт сервісу
             sudo systemctl daemon-reload
             sudo systemctl restart flaskapp
             sleep 2
             sudo systemctl --no-pager -l status flaskapp
 
+      # Якщо у тебе немає роута "/", заміни на свій, напр. /health/db або /apidocs
       - name: Healthcheck
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -52,5 +64,4 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            # якщо у тебе нема роута "/", заміни на реальний (напр. /apidocs чи /health/db)
-            curl -sf http://127.0.0.1:5000/ || echo "No root route (that's OK if you don't have one)"
+            curl -sf http://127.0.0.1:5000/ || echo "No root route (that's OK if your root is different)"
