@@ -1,0 +1,76 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]   # або інша гілка, з якої деплоїш
+
+concurrency:
+  group: ec2-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Копіюємо код на EC2 (поверх /home/ubuntu/db), виключаємо зайве
+      - name: Upload repository to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "."
+          target: "/home/ubuntu/db"
+          strip_components: 0
+          rm: true
+          overwrite: true
+          # ігноруємо git/ci-файли та артефакти
+          exclude: |
+            .git*
+            .github/*
+            **/__pycache__/**
+            **/*.pyc
+
+      # На сервері: оновити залежності у venv і перезапустити systemd сервіс
+      - name: Install deps & restart service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd /home/ubuntu/db/app
+            # створити venv, якщо його немає
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            source venv/bin/activate
+            pip install --upgrade pip setuptools wheel
+            # встановити залежності (якщо файл існує)
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            fi
+            deactivate
+            # перезапустити сервіс
+            sudo systemctl daemon-reload
+            sudo systemctl restart flaskapp
+            sleep 2
+            sudo systemctl --no-pager -l status flaskapp
+
+      # Проста перевірка живості (локально з EC2)
+      - name: Healthcheck
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            curl -sf http://127.0.0.1:5000/ || (echo "App not responding on /"; exit 1)
+            # якщо маєш health-роут до БД, розкоментуй:
+            # curl -sf http://127.0.0.1:5000/health/db || (echo "DB health failed"; exit 1)
