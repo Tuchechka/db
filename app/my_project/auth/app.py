@@ -19,7 +19,7 @@ app.mysql = mysql
 swagger = Swagger(app, template={
     "swagger": "2.0",
     "info": {
-        "title": "DB&Knowledge Course API",
+        "title": "Swagger API",
         "version": "1.0.0",
         "description": "REST endpoints for users/courses/modules/tests/questions"
     },
